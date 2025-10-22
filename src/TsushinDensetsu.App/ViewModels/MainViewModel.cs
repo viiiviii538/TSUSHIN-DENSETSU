@@ -8,12 +8,12 @@ namespace TsushinDensetsu.App.ViewModels;
 public class MainViewModel
 {
     public MainViewModel(
-        ISpeedTestService speedTestService,
+        SpeedTestViewModel speedTestViewModel,
         ISecurityScanService securityScanService,
         INetworkTopologyService networkTopologyService)
     {
         WelcomeMessage = "ようこそ、通信伝説ダッシュボードへ！";
-        SpeedTestSummary = speedTestService.GetSpeedSummary();
+        SpeedTest = speedTestViewModel;
         SecurityStatus = securityScanService.GetSecurityStatus();
         NetworkDevices = networkTopologyService.GetNetworkDevices();
         NetworkOverview = string.Join(", ", NetworkDevices.Select(device => $"{device.Name} ({device.Role})"));
@@ -21,7 +21,7 @@ public class MainViewModel
 
     public string WelcomeMessage { get; }
 
-    public string SpeedTestSummary { get; }
+    public SpeedTestViewModel SpeedTest { get; }
 
     public string SecurityStatus { get; }
 

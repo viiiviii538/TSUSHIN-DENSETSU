@@ -1,6 +1,9 @@
+using System.Threading;
+using System.Threading.Tasks;
+
 namespace TsushinDensetsu.App.Services;
 
 public interface ISpeedTestService
 {
-    string GetSpeedSummary();
+    Task<SpeedTestResult> RunTestAsync(CancellationToken cancellationToken = default);
 }
