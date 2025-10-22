@@ -5,6 +5,7 @@ using Moq;
 using TsushinDensetsu.App.Services;
 using TsushinDensetsu.App.ViewModels;
 using Xunit;
+using static TsushinDensetsu.App.Tests.TestHelpers.AsyncTestHelper;
 
 namespace TsushinDensetsu.App.Tests;
 
@@ -87,21 +88,5 @@ public class SpeedTestViewModelTests
         Assert.True(viewModel.StartTestCommand.CanExecute(null));
 
         serviceMock.Verify(service => service.RunTestAsync(It.IsAny<CancellationToken>()), Times.Once);
-    }
-
-    private static async Task WaitForAsync(Func<bool> condition, TimeSpan? timeout = null)
-    {
-        timeout ??= TimeSpan.FromSeconds(1);
-        var start = DateTime.UtcNow;
-
-        while (!condition())
-        {
-            if (DateTime.UtcNow - start > timeout)
-            {
-                throw new TimeoutException("Condition was not met within the allotted time.");
-            }
-
-            await Task.Delay(10);
-        }
     }
 }
