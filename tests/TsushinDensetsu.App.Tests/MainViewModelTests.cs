@@ -71,9 +71,9 @@ public class MainViewModelTests
             _status = status;
         }
 
-        public string GetSecurityStatus()
+        public Task<string> GetSecurityStatusAsync(CancellationToken cancellationToken = default)
         {
-            return _status;
+            return Task.FromResult(_status);
         }
     }
 

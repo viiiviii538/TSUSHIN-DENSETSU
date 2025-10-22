@@ -1,9 +1,13 @@
+using System.Threading;
+using System.Threading.Tasks;
+
 namespace TsushinDensetsu.App.Services;
 
 public class SecurityScanService : ISecurityScanService
 {
-    public string GetSecurityStatus()
+    public Task<string> GetSecurityStatusAsync(CancellationToken cancellationToken = default)
     {
-        return "No critical vulnerabilities detected in the last scan.";
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult("No critical vulnerabilities detected in the last scan.");
     }
 }
