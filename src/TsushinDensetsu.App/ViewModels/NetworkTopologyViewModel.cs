@@ -40,22 +40,23 @@ public class NetworkTopologyViewModel : ViewModelBase
             TopologySummary = "ネットワーク構成を更新しています…";
 
             var devices = await Task.Run(() => _networkTopologyService.GetNetworkDevices());
-            var deviceList = devices.ToList();
-            Devices = deviceList;
+            var normalizedDevices = (devices ?? Array.Empty<NetworkDevice>()).ToList();
+            Devices = normalizedDevices;
 
-            if (deviceList.Count == 0)
+            if (Devices.Count == 0)
             {
                 TopologySummary = "現在登録されているネットワーク機器はありません。";
                 return;
             }
 
-            var entries = deviceList
+            var entries = Devices
                 .Select(device => $"{device.Name}（役割: {device.Role}）");
 
             TopologySummary = "取得した機器一覧:" + Environment.NewLine + string.Join(Environment.NewLine, entries);
         }
         catch (Exception ex)
         {
+            Devices = Array.Empty<NetworkDevice>();
             TopologySummary = $"構成情報の取得に失敗しました: {ex.Message}";
         }
     }
