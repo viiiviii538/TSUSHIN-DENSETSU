@@ -1,13 +1,17 @@
+using System;
 using System.Threading.Tasks;
+using TsushinDensetsu.App.Services;
 
 namespace TsushinDensetsu.App.ViewModels;
 
 public class SecurityScanViewModel : ViewModelBase
 {
+    private readonly ISecurityScanService _securityScanService;
     private string _scanStatus = "セキュリティ診断の準備ができています。";
 
-    public SecurityScanViewModel()
+    public SecurityScanViewModel(ISecurityScanService securityScanService)
     {
+        _securityScanService = securityScanService;
         RunSecurityScanCommand = new AsyncRelayCommand(RunSecurityScanAsync);
     }
 
@@ -19,10 +23,17 @@ public class SecurityScanViewModel : ViewModelBase
         private set => SetProperty(ref _scanStatus, value);
     }
 
-    private Task RunSecurityScanAsync()
+    private async Task RunSecurityScanAsync()
     {
-        // TODO: Replace this placeholder with real security scan logic that gathers vulnerability details.
-        ScanStatus = "診断機能は準備中です。今後、脆弱性チェックの結果がここに表示されます。";
-        return Task.CompletedTask;
+        try
+        {
+            ScanStatus = "診断を実行しています...";
+            var status = await Task.Run(_securityScanService.GetSecurityStatus);
+            ScanStatus = status;
+        }
+        catch (Exception ex)
+        {
+            ScanStatus = $"診断中にエラーが発生しました: {ex.Message}";
+        }
     }
 }
