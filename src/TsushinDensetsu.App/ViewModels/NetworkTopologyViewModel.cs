@@ -1,13 +1,18 @@
+using System;
+using System.Linq;
 using System.Threading.Tasks;
+using TsushinDensetsu.App.Services;
 
 namespace TsushinDensetsu.App.ViewModels;
 
 public class NetworkTopologyViewModel : ViewModelBase
 {
+    private readonly INetworkTopologyService _networkTopologyService;
     private string _topologySummary = "回線構成図を表示する準備ができています。";
 
-    public NetworkTopologyViewModel()
+    public NetworkTopologyViewModel(INetworkTopologyService networkTopologyService)
     {
+        _networkTopologyService = networkTopologyService ?? throw new ArgumentNullException(nameof(networkTopologyService));
         RefreshTopologyCommand = new AsyncRelayCommand(RefreshTopologyAsync);
     }
 
@@ -19,10 +24,28 @@ public class NetworkTopologyViewModel : ViewModelBase
         private set => SetProperty(ref _topologySummary, value);
     }
 
-    private Task RefreshTopologyAsync()
+    private async Task RefreshTopologyAsync()
     {
-        // TODO: Implement topology discovery to render diagrams generated from live network data.
-        TopologySummary = "構成図の自動生成機能は開発予定です。将来はネットワーク機器の接続関係が図として表示されます。";
-        return Task.CompletedTask;
+        try
+        {
+            TopologySummary = "ネットワーク構成を更新しています…";
+
+            var devices = await Task.Run(() => _networkTopologyService.GetNetworkDevices());
+
+            if (devices.Count == 0)
+            {
+                TopologySummary = "現在登録されているネットワーク機器はありません。";
+                return;
+            }
+
+            var entries = devices
+                .Select(device => $"{device.Name}（役割: {device.Role}）");
+
+            TopologySummary = "取得した機器一覧:" + Environment.NewLine + string.Join(Environment.NewLine, entries);
+        }
+        catch (Exception ex)
+        {
+            TopologySummary = $"構成情報の取得に失敗しました: {ex.Message}";
+        }
     }
 }
