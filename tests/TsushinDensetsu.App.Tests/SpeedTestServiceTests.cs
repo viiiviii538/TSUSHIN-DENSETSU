@@ -66,6 +66,21 @@ Upload: 42.51 Mbps (data used: 63.6 MB)
     }
 
     [Fact]
+    public async Task RunTestAsync_ThrowsWhenOutputIsEmpty()
+    {
+        var runnerMock = new Mock<IProcessRunner>(MockBehavior.Strict);
+        runnerMock
+            .Setup(runner => runner.RunAsync("speedtest.exe", It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ProcessRunResult(0, string.Empty, string.Empty));
+
+        var service = new SpeedTestService(runnerMock.Object);
+
+        var exception = await Assert.ThrowsAsync<SpeedTestException>(() => service.RunTestAsync());
+
+        Assert.Equal("速度測定結果が取得できませんでした。", exception.Message);
+    }
+
+    [Fact]
     public async Task RunTestAsync_ParsesGbpsAndIdleLatencyLabel()
     {
         const string output = """
@@ -88,6 +103,32 @@ Upload: 940.5 Mbps (data used: 300.0 MB)
         Assert.Equal(940.5, result.UploadMbps, 2);
         Assert.Equal(5.5, result.PingMilliseconds, 2);
         Assert.Equal(0.10, result.JitterMilliseconds, 2);
+        Assert.Equal(output, result.RawOutput);
+    }
+
+    [Fact]
+    public async Task RunTestAsync_ParsesCommaDecimalValues()
+    {
+        const string output = """
+Speedtest by Ookla
+Latency: 11,50 ms   (jitter: 0,25 ms)
+Download: 123,45 Mbps (data used: 200,0 MB)
+Upload: 67,89 Mbps (data used: 100,0 MB)
+""";
+
+        var runnerMock = new Mock<IProcessRunner>(MockBehavior.Strict);
+        runnerMock
+            .Setup(runner => runner.RunAsync("speedtest.exe", It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ProcessRunResult(0, output, string.Empty));
+
+        var service = new SpeedTestService(runnerMock.Object);
+
+        var result = await service.RunTestAsync();
+
+        Assert.Equal(123.45, result.DownloadMbps, 2);
+        Assert.Equal(67.89, result.UploadMbps, 2);
+        Assert.Equal(11.50, result.PingMilliseconds, 2);
+        Assert.Equal(0.25, result.JitterMilliseconds, 2);
         Assert.Equal(output, result.RawOutput);
     }
 
