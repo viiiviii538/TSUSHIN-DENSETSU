@@ -1,7 +1,9 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using TsushinDensetsu.App.Services;
+using TsushinDensetsu.App.Domain;
 
 namespace TsushinDensetsu.App.ViewModels;
 
@@ -9,6 +11,7 @@ public class NetworkTopologyViewModel : ViewModelBase
 {
     private readonly INetworkTopologyService _networkTopologyService;
     private string _topologySummary = "回線構成図を表示する準備ができています。";
+    private IReadOnlyList<NetworkDevice> _devices = Array.Empty<NetworkDevice>();
 
     public NetworkTopologyViewModel(INetworkTopologyService networkTopologyService)
     {
@@ -17,6 +20,12 @@ public class NetworkTopologyViewModel : ViewModelBase
     }
 
     public AsyncRelayCommand RefreshTopologyCommand { get; }
+
+    public IReadOnlyList<NetworkDevice> Devices
+    {
+        get => _devices;
+        private set => SetProperty(ref _devices, value);
+    }
 
     public string TopologySummary
     {
@@ -31,14 +40,16 @@ public class NetworkTopologyViewModel : ViewModelBase
             TopologySummary = "ネットワーク構成を更新しています…";
 
             var devices = await Task.Run(() => _networkTopologyService.GetNetworkDevices());
+            var deviceList = devices.ToList();
+            Devices = deviceList;
 
-            if (devices.Count == 0)
+            if (deviceList.Count == 0)
             {
                 TopologySummary = "現在登録されているネットワーク機器はありません。";
                 return;
             }
 
-            var entries = devices
+            var entries = deviceList
                 .Select(device => $"{device.Name}（役割: {device.Role}）");
 
             TopologySummary = "取得した機器一覧:" + Environment.NewLine + string.Join(Environment.NewLine, entries);

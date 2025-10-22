@@ -35,6 +35,7 @@ public class NetworkTopologyViewModelTests
         await WaitForAsync(() => viewModel.TopologySummary == expectedSummary);
 
         Assert.Equal(expectedSummary, viewModel.TopologySummary);
+        Assert.Equal(devices, viewModel.Devices);
         serviceMock.Verify(service => service.GetNetworkDevices(), Times.Once);
     }
 
@@ -53,6 +54,7 @@ public class NetworkTopologyViewModelTests
         await WaitForAsync(() => viewModel.TopologySummary == "現在登録されているネットワーク機器はありません。");
 
         Assert.Equal("現在登録されているネットワーク機器はありません。", viewModel.TopologySummary);
+        Assert.Empty(viewModel.Devices);
         serviceMock.Verify(service => service.GetNetworkDevices(), Times.Once);
     }
 
