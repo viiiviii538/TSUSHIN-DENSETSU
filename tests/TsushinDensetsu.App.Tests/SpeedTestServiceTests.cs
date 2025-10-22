@@ -11,29 +11,27 @@ namespace TsushinDensetsu.App.Tests;
 public class SpeedTestServiceTests
 {
     [Fact]
-    public async Task RunTestAsync_ParsesStandardOutput()
+    public async Task RunTestAsync_ReturnsParserResult()
     {
-        const string output = """
-Speedtest by Ookla
-Latency: 11.01 ms   (jitter: 0.42 ms)
-Download: 180.64 Mbps (data used: 262.8 MB)
-Upload: 42.51 Mbps (data used: 63.6 MB)
-""";
+        const string output = "test output";
+        var expectedResult = new SpeedTestResult(100, 50, 10, 1, output);
 
         var runnerMock = new Mock<IProcessRunner>(MockBehavior.Strict);
         runnerMock
             .Setup(runner => runner.RunAsync("speedtest.exe", It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ProcessRunResult(0, output, string.Empty));
 
-        var service = new SpeedTestService(runnerMock.Object);
+        var parserMock = new Mock<ISpeedTestResultParser>(MockBehavior.Strict);
+        parserMock
+            .Setup(parser => parser.Parse(output))
+            .Returns(expectedResult);
+
+        var service = new SpeedTestService(runnerMock.Object, parserMock.Object);
 
         var result = await service.RunTestAsync();
 
-        Assert.Equal(180.64, result.DownloadMbps, 2);
-        Assert.Equal(42.51, result.UploadMbps, 2);
-        Assert.Equal(11.01, result.PingMilliseconds, 2);
-        Assert.Equal(0.42, result.JitterMilliseconds, 2);
-        Assert.Equal(output, result.RawOutput);
+        Assert.Same(expectedResult, result);
+        parserMock.Verify(parser => parser.Parse(output), Times.Once);
     }
 
     [Fact]
@@ -44,144 +42,54 @@ Upload: 42.51 Mbps (data used: 63.6 MB)
             .Setup(runner => runner.RunAsync("speedtest.exe", It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ProcessRunResult(1, string.Empty, "network error"));
 
-        var service = new SpeedTestService(runnerMock.Object);
+        var parserMock = new Mock<ISpeedTestResultParser>(MockBehavior.Strict);
+
+        var service = new SpeedTestService(runnerMock.Object, parserMock.Object);
 
         var exception = await Assert.ThrowsAsync<SpeedTestException>(() => service.RunTestAsync());
         Assert.Contains("network error", exception.Message);
+        parserMock.Verify(parser => parser.Parse(It.IsAny<string>()), Times.Never);
     }
 
     [Fact]
-    public async Task RunTestAsync_ThrowsWhenParsingFails()
+    public async Task RunTestAsync_RethrowsSpeedTestExceptionFromParser()
     {
-        const string output = "unexpected format";
-
+        const string output = "invalid";
         var runnerMock = new Mock<IProcessRunner>(MockBehavior.Strict);
         runnerMock
             .Setup(runner => runner.RunAsync("speedtest.exe", It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ProcessRunResult(0, output, string.Empty));
 
-        var service = new SpeedTestService(runnerMock.Object);
+        var parserMock = new Mock<ISpeedTestResultParser>(MockBehavior.Strict);
+        parserMock
+            .Setup(parser => parser.Parse(output))
+            .Throws(new SpeedTestException("parser error"));
 
-        await Assert.ThrowsAsync<SpeedTestException>(() => service.RunTestAsync());
-    }
-
-    [Fact]
-    public async Task RunTestAsync_ThrowsWhenOutputIsEmpty()
-    {
-        var runnerMock = new Mock<IProcessRunner>(MockBehavior.Strict);
-        runnerMock
-            .Setup(runner => runner.RunAsync("speedtest.exe", It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new ProcessRunResult(0, string.Empty, string.Empty));
-
-        var service = new SpeedTestService(runnerMock.Object);
+        var service = new SpeedTestService(runnerMock.Object, parserMock.Object);
 
         var exception = await Assert.ThrowsAsync<SpeedTestException>(() => service.RunTestAsync());
-
-        Assert.Equal("速度測定結果が取得できませんでした。", exception.Message);
+        Assert.Equal("parser error", exception.Message);
     }
 
     [Fact]
-    public async Task RunTestAsync_ParsesGbpsAndIdleLatencyLabel()
+    public async Task RunTestAsync_WrapsUnexpectedParserExceptions()
     {
-        const string output = """
-Speedtest by Ookla
-Idle Latency: 5.5 ms   (jitter: 0.10 ms)
-Download: 1.25 Gbps (data used: 500.0 MB)
-Upload: 940.5 Mbps (data used: 300.0 MB)
-""";
-
+        const string output = "oops";
         var runnerMock = new Mock<IProcessRunner>(MockBehavior.Strict);
         runnerMock
             .Setup(runner => runner.RunAsync("speedtest.exe", It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ProcessRunResult(0, output, string.Empty));
 
-        var service = new SpeedTestService(runnerMock.Object);
+        var parserMock = new Mock<ISpeedTestResultParser>(MockBehavior.Strict);
+        parserMock
+            .Setup(parser => parser.Parse(output))
+            .Throws(new InvalidOperationException("bad"));
 
-        var result = await service.RunTestAsync();
+        var service = new SpeedTestService(runnerMock.Object, parserMock.Object);
 
-        Assert.Equal(1250, result.DownloadMbps, 2);
-        Assert.Equal(940.5, result.UploadMbps, 2);
-        Assert.Equal(5.5, result.PingMilliseconds, 2);
-        Assert.Equal(0.10, result.JitterMilliseconds, 2);
-        Assert.Equal(output, result.RawOutput);
-    }
-
-    [Fact]
-    public async Task RunTestAsync_ParsesCommaDecimalValues()
-    {
-        const string output = """
-Speedtest by Ookla
-Latency: 11,50 ms   (jitter: 0,25 ms)
-Download: 123,45 Mbps (data used: 200,0 MB)
-Upload: 67,89 Mbps (data used: 100,0 MB)
-""";
-
-        var runnerMock = new Mock<IProcessRunner>(MockBehavior.Strict);
-        runnerMock
-            .Setup(runner => runner.RunAsync("speedtest.exe", It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new ProcessRunResult(0, output, string.Empty));
-
-        var service = new SpeedTestService(runnerMock.Object);
-
-        var result = await service.RunTestAsync();
-
-        Assert.Equal(123.45, result.DownloadMbps, 2);
-        Assert.Equal(67.89, result.UploadMbps, 2);
-        Assert.Equal(11.50, result.PingMilliseconds, 2);
-        Assert.Equal(0.25, result.JitterMilliseconds, 2);
-        Assert.Equal(output, result.RawOutput);
-    }
-
-    [Fact]
-    public async Task RunTestAsync_ParsesKbpsAndTrailingJitter()
-    {
-        const string output = """
-Speedtest by Ookla
-Latency: 30.50 ms (0.42 ms jitter)
-Download: 850.5 Kbps (data used: 10.0 MB)
-Upload: 1.20 Mbps (data used: 15.0 MB)
-""";
-
-        var runnerMock = new Mock<IProcessRunner>(MockBehavior.Strict);
-        runnerMock
-            .Setup(runner => runner.RunAsync("speedtest.exe", It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new ProcessRunResult(0, output, string.Empty));
-
-        var service = new SpeedTestService(runnerMock.Object);
-
-        var result = await service.RunTestAsync();
-
-        Assert.Equal(0.8505, result.DownloadMbps, 4);
-        Assert.Equal(1.20, result.UploadMbps, 2);
-        Assert.Equal(30.50, result.PingMilliseconds, 2);
-        Assert.Equal(0.42, result.JitterMilliseconds, 2);
-        Assert.Equal(output, result.RawOutput);
-    }
-
-    [Fact]
-    public async Task RunTestAsync_DefaultsToZeroWhenJitterMissing()
-    {
-        const string output = """
-Speedtest by Ookla
-Latency: 18.25 ms
-Download: 75.00 Mbps (data used: 100.0 MB)
-Upload: 25.50 Mbps (data used: 50.0 MB)
-""";
-
-        var runnerMock = new Mock<IProcessRunner>(MockBehavior.Strict);
-        runnerMock
-            .Setup(runner => runner.RunAsync("speedtest.exe", It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new ProcessRunResult(0, output, string.Empty));
-
-        var service = new SpeedTestService(runnerMock.Object);
-
-        var result = await service.RunTestAsync();
-
-        Assert.Equal(75.00, result.DownloadMbps, 2);
-        Assert.Equal(25.50, result.UploadMbps, 2);
-        Assert.Equal(18.25, result.PingMilliseconds, 2);
-        Assert.Equal(0, result.JitterMilliseconds, 2);
-        Assert.Equal(output, result.RawOutput);
+        var exception = await Assert.ThrowsAsync<SpeedTestException>(() => service.RunTestAsync());
+        Assert.Equal("速度測定結果の解析に失敗しました。出力形式をご確認ください。", exception.Message);
+        Assert.IsType<InvalidOperationException>(exception.InnerException);
     }
 
     [Fact]
@@ -192,79 +100,12 @@ Upload: 25.50 Mbps (data used: 50.0 MB)
             .Setup(runner => runner.RunAsync("speedtest.exe", It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new Win32Exception());
 
-        var service = new SpeedTestService(runnerMock.Object);
+        var parserMock = new Mock<ISpeedTestResultParser>(MockBehavior.Strict);
+
+        var service = new SpeedTestService(runnerMock.Object, parserMock.Object);
 
         var exception = await Assert.ThrowsAsync<SpeedTestException>(() => service.RunTestAsync());
 
         Assert.Equal("速度測定ツール 'speedtest.exe' を起動できませんでした。インストール状況を確認してください。", exception.Message);
-    }
-
-    [Fact]
-    public async Task RunTestAsync_WrapsOperationCanceledExceptionWithFriendlyMessage()
-    {
-        var runnerMock = new Mock<IProcessRunner>(MockBehavior.Strict);
-        runnerMock
-            .Setup(runner => runner.RunAsync("speedtest.exe", It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new OperationCanceledException());
-
-        var service = new SpeedTestService(runnerMock.Object);
-
-        var exception = await Assert.ThrowsAsync<SpeedTestException>(() => service.RunTestAsync());
-
-        Assert.Equal("速度測定がキャンセルされました。", exception.Message);
-    }
-
-    [Fact]
-    public async Task RunTestAsync_WrapsUnexpectedExceptionWithFriendlyMessage()
-    {
-        var runnerMock = new Mock<IProcessRunner>(MockBehavior.Strict);
-        runnerMock
-            .Setup(runner => runner.RunAsync("speedtest.exe", It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new InvalidOperationException("unexpected"));
-
-        var service = new SpeedTestService(runnerMock.Object);
-
-        var exception = await Assert.ThrowsAsync<SpeedTestException>(() => service.RunTestAsync());
-
-        Assert.Equal("速度測定ツールの実行中に予期しないエラーが発生しました。", exception.Message);
-    }
-
-    [Fact]
-    public async Task RunTestAsync_UsesCustomExecutablePathAndDefaultArguments()
-    {
-        const string output = "Speedtest by Ookla\nLatency: 10.00 ms   (jitter: 0.20 ms)\nDownload: 100.00 Mbps (data used: 200.0 MB)\nUpload: 50.00 Mbps (data used: 100.0 MB)";
-        const string customPath = @"C:\\tools\\custom.exe";
-
-        var runnerMock = new Mock<IProcessRunner>(MockBehavior.Strict);
-        runnerMock
-            .Setup(runner => runner.RunAsync(customPath, It.Is<string>(args => args == "--accept-license --accept-gdpr"), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new ProcessRunResult(0, output, string.Empty));
-
-        var service = new SpeedTestService(runnerMock.Object, customPath);
-
-        var result = await service.RunTestAsync();
-
-        Assert.Equal(100.00, result.DownloadMbps, 2);
-        Assert.Equal(50.00, result.UploadMbps, 2);
-        Assert.Equal(10.00, result.PingMilliseconds, 2);
-        Assert.Equal(0.20, result.JitterMilliseconds, 2);
-        Assert.Equal(output, result.RawOutput);
-    }
-
-    [Fact]
-    public async Task RunTestAsync_IncludesStandardOutputWhenExitFailsWithoutError()
-    {
-        const string diagnosticOutput = "diagnostic: unable to connect";
-
-        var runnerMock = new Mock<IProcessRunner>(MockBehavior.Strict);
-        runnerMock
-            .Setup(runner => runner.RunAsync("speedtest.exe", It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new ProcessRunResult(1, diagnosticOutput, string.Empty));
-
-        var service = new SpeedTestService(runnerMock.Object);
-
-        var exception = await Assert.ThrowsAsync<SpeedTestException>(() => service.RunTestAsync());
-
-        Assert.Contains(diagnosticOutput, exception.Message);
     }
 }

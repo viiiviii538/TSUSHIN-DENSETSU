@@ -10,6 +10,7 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddTsushinDensetsuApp(this IServiceCollection services)
     {
         services.AddSingleton<IProcessRunner, ProcessRunner>();
+        services.AddSingleton<ISpeedTestResultParser, SpeedTestResultParser>();
         services.AddSingleton<ISpeedTestService, SpeedTestService>();
         services.AddSingleton<ISecurityScanService, SecurityScanService>();
         services.AddSingleton<INetworkTopologyService, NetworkTopologyService>();
