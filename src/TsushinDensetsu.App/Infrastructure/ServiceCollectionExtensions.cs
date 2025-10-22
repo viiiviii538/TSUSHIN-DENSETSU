@@ -9,10 +9,12 @@ public static class ServiceCollectionExtensions
 {
     public static IServiceCollection AddTsushinDensetsuApp(this IServiceCollection services)
     {
+        services.AddSingleton<IProcessRunner, ProcessRunner>();
         services.AddSingleton<ISpeedTestService, SpeedTestService>();
         services.AddSingleton<ISecurityScanService, SecurityScanService>();
         services.AddSingleton<INetworkTopologyService, NetworkTopologyService>();
 
+        services.AddSingleton<SpeedTestViewModel>();
         services.AddSingleton<MainViewModel>();
         services.AddSingleton<MainWindow>();
 
