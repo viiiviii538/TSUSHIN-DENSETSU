@@ -1,3 +1,5 @@
+using System;
+using System.ComponentModel;
 using System.Threading;
 using System.Threading.Tasks;
 using Moq;
@@ -139,5 +141,50 @@ Upload: 25.50 Mbps (data used: 50.0 MB)
         Assert.Equal(18.25, result.PingMilliseconds, 2);
         Assert.Equal(0, result.JitterMilliseconds, 2);
         Assert.Equal(output, result.RawOutput);
+    }
+
+    [Fact]
+    public async Task RunTestAsync_WrapsWin32ExceptionWithFriendlyMessage()
+    {
+        var runnerMock = new Mock<IProcessRunner>(MockBehavior.Strict);
+        runnerMock
+            .Setup(runner => runner.RunAsync("speedtest.exe", It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new Win32Exception());
+
+        var service = new SpeedTestService(runnerMock.Object);
+
+        var exception = await Assert.ThrowsAsync<SpeedTestException>(() => service.RunTestAsync());
+
+        Assert.Equal("速度測定ツール 'speedtest.exe' を起動できませんでした。インストール状況を確認してください。", exception.Message);
+    }
+
+    [Fact]
+    public async Task RunTestAsync_WrapsOperationCanceledExceptionWithFriendlyMessage()
+    {
+        var runnerMock = new Mock<IProcessRunner>(MockBehavior.Strict);
+        runnerMock
+            .Setup(runner => runner.RunAsync("speedtest.exe", It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new OperationCanceledException());
+
+        var service = new SpeedTestService(runnerMock.Object);
+
+        var exception = await Assert.ThrowsAsync<SpeedTestException>(() => service.RunTestAsync());
+
+        Assert.Equal("速度測定がキャンセルされました。", exception.Message);
+    }
+
+    [Fact]
+    public async Task RunTestAsync_WrapsUnexpectedExceptionWithFriendlyMessage()
+    {
+        var runnerMock = new Mock<IProcessRunner>(MockBehavior.Strict);
+        runnerMock
+            .Setup(runner => runner.RunAsync("speedtest.exe", It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("unexpected"));
+
+        var service = new SpeedTestService(runnerMock.Object);
+
+        var exception = await Assert.ThrowsAsync<SpeedTestException>(() => service.RunTestAsync());
+
+        Assert.Equal("速度測定ツールの実行中に予期しないエラーが発生しました。", exception.Message);
     }
 }
