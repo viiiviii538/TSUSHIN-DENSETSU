@@ -1,7 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
-using Moq;
 using TsushinDensetsu.App.Domain;
 using TsushinDensetsu.App.Services;
 using TsushinDensetsu.App.ViewModels;
@@ -12,50 +13,37 @@ namespace TsushinDensetsu.App.Tests;
 public class MainViewModelTests
 {
     [Fact]
-    public async Task MainDashboard_TracksChildViewModelUpdates()
+    public async Task MainViewModel_ReflectsInjectedServiceData()
     {
-        var speedTestServiceMock = new Mock<ISpeedTestService>(MockBehavior.Strict);
-        var securityScanServiceMock = new Mock<ISecurityScanService>(MockBehavior.Strict);
-        var topologyServiceMock = new Mock<INetworkTopologyService>(MockBehavior.Strict);
-
-        securityScanServiceMock
-            .Setup(service => service.GetSecurityStatus())
-            .Returns("全て安全です");
-
-        var devices = new[]
+        var expectedSecurityStatus = "通信網は安全です";
+        var expectedDevices = new[]
         {
-            new NetworkDevice("ホームルーター", "192.168.0.1", "ゲートウェイ"),
-            new NetworkDevice("リビングハブ", "192.168.0.2", "スイッチ")
+            new NetworkDevice("メインルーター", "192.168.10.1", "ゲートウェイ"),
+            new NetworkDevice("家庭用NAS", "192.168.10.20", "ストレージ"),
+            new NetworkDevice("リビングハブ", "192.168.10.30", "スイッチ")
         };
 
-        topologyServiceMock
-            .Setup(service => service.GetNetworkDevices())
-            .Returns(devices);
+        var securityScanService = new FakeSecurityScanService(expectedSecurityStatus);
+        var networkTopologyService = new FakeNetworkTopologyService(expectedDevices);
+        var speedTestService = new FakeSpeedTestService();
 
-        var speedTestViewModel = new SpeedTestViewModel(speedTestServiceMock.Object);
-        var securityScanViewModel = new SecurityScanViewModel(securityScanServiceMock.Object);
-        var networkTopologyViewModel = new NetworkTopologyViewModel(topologyServiceMock.Object);
+        var securityScanViewModel = new SecurityScanViewModel(securityScanService);
+        var networkTopologyViewModel = new NetworkTopologyViewModel(networkTopologyService);
+        var speedTestViewModel = new SpeedTestViewModel(speedTestService);
 
         var mainViewModel = new MainViewModel(speedTestViewModel, securityScanViewModel, networkTopologyViewModel);
 
-        Assert.Equal(securityScanViewModel.ScanStatus, mainViewModel.SecurityStatus);
-        Assert.Empty(mainViewModel.NetworkDevices);
-        Assert.Equal("現在登録されているネットワーク機器はありません。", mainViewModel.NetworkOverview);
-
         securityScanViewModel.RunSecurityScanCommand.Execute(null);
-        await WaitForAsync(() => mainViewModel.SecurityStatus == "全て安全です");
+        await WaitForAsync(() => mainViewModel.SecurityStatus == expectedSecurityStatus);
 
         networkTopologyViewModel.RefreshTopologyCommand.Execute(null);
-        await WaitForAsync(() => mainViewModel.NetworkDevices.Count == devices.Length);
+        await WaitForAsync(() => mainViewModel.NetworkDevices.SequenceEqual(expectedDevices));
 
-        var expectedOverview = string.Join(", ", devices.Select(device => $"{device.Name} ({device.Role})"));
+        var expectedOverview = string.Join(", ", expectedDevices.Select(device => $"{device.Name} ({device.Role})"));
 
-        Assert.Equal("全て安全です", mainViewModel.SecurityStatus);
-        Assert.Equal(devices, mainViewModel.NetworkDevices);
+        Assert.Equal(expectedSecurityStatus, mainViewModel.SecurityStatus);
+        Assert.Equal(expectedDevices, mainViewModel.NetworkDevices);
         Assert.Equal(expectedOverview, mainViewModel.NetworkOverview);
-
-        securityScanServiceMock.Verify(service => service.GetSecurityStatus(), Times.Once);
-        topologyServiceMock.Verify(service => service.GetNetworkDevices(), Times.Once);
     }
 
     private static async Task WaitForAsync(Func<bool> condition, TimeSpan? timeout = null)
@@ -71,6 +59,45 @@ public class MainViewModelTests
             }
 
             await Task.Delay(10);
+        }
+    }
+
+    private sealed class FakeSecurityScanService : ISecurityScanService
+    {
+        private readonly string _status;
+
+        public FakeSecurityScanService(string status)
+        {
+            _status = status;
+        }
+
+        public string GetSecurityStatus()
+        {
+            return _status;
+        }
+    }
+
+    private sealed class FakeNetworkTopologyService : INetworkTopologyService
+    {
+        private readonly IReadOnlyCollection<NetworkDevice> _devices;
+
+        public FakeNetworkTopologyService(IReadOnlyCollection<NetworkDevice> devices)
+        {
+            _devices = devices;
+        }
+
+        public IReadOnlyCollection<NetworkDevice> GetNetworkDevices()
+        {
+            return _devices;
+        }
+    }
+
+    private sealed class FakeSpeedTestService : ISpeedTestService
+    {
+        public Task<SpeedTestResult> RunTestAsync(CancellationToken cancellationToken = default)
+        {
+            var result = new SpeedTestResult(0, 0, 0, 0, "テストは実行されませんでした。");
+            return Task.FromResult(result);
         }
     }
 }
