@@ -228,4 +228,43 @@ Upload: 25.50 Mbps (data used: 50.0 MB)
 
         Assert.Equal("速度測定ツールの実行中に予期しないエラーが発生しました。", exception.Message);
     }
+
+    [Fact]
+    public async Task RunTestAsync_UsesCustomExecutablePathAndDefaultArguments()
+    {
+        const string output = "Speedtest by Ookla\nLatency: 10.00 ms   (jitter: 0.20 ms)\nDownload: 100.00 Mbps (data used: 200.0 MB)\nUpload: 50.00 Mbps (data used: 100.0 MB)";
+        const string customPath = @"C:\\tools\\custom.exe";
+
+        var runnerMock = new Mock<IProcessRunner>(MockBehavior.Strict);
+        runnerMock
+            .Setup(runner => runner.RunAsync(customPath, It.Is<string>(args => args == "--accept-license --accept-gdpr"), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ProcessRunResult(0, output, string.Empty));
+
+        var service = new SpeedTestService(runnerMock.Object, customPath);
+
+        var result = await service.RunTestAsync();
+
+        Assert.Equal(100.00, result.DownloadMbps, 2);
+        Assert.Equal(50.00, result.UploadMbps, 2);
+        Assert.Equal(10.00, result.PingMilliseconds, 2);
+        Assert.Equal(0.20, result.JitterMilliseconds, 2);
+        Assert.Equal(output, result.RawOutput);
+    }
+
+    [Fact]
+    public async Task RunTestAsync_IncludesStandardOutputWhenExitFailsWithoutError()
+    {
+        const string diagnosticOutput = "diagnostic: unable to connect";
+
+        var runnerMock = new Mock<IProcessRunner>(MockBehavior.Strict);
+        runnerMock
+            .Setup(runner => runner.RunAsync("speedtest.exe", It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ProcessRunResult(1, diagnosticOutput, string.Empty));
+
+        var service = new SpeedTestService(runnerMock.Object);
+
+        var exception = await Assert.ThrowsAsync<SpeedTestException>(() => service.RunTestAsync());
+
+        Assert.Contains(diagnosticOutput, exception.Message);
+    }
 }
