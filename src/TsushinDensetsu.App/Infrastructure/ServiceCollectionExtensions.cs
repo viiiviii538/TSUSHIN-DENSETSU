@@ -15,6 +15,8 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<INetworkTopologyService, NetworkTopologyService>();
 
         services.AddSingleton<SpeedTestViewModel>();
+        services.AddSingleton<SecurityScanViewModel>();
+        services.AddSingleton<NetworkTopologyViewModel>();
         services.AddSingleton<MainViewModel>();
         services.AddSingleton<MainWindow>();
 

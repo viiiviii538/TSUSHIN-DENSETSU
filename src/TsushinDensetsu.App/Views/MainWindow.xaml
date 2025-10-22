@@ -98,6 +98,44 @@
                     </Grid>
                 </Grid>
             </TabItem>
+            <TabItem Header="セキュリティ診断" DataContext="{Binding SecurityScan}">
+                <Grid Margin="16">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <Button Content="診断を開始"
+                            Command="{Binding RunSecurityScanCommand}"
+                            HorizontalAlignment="Left"
+                            Padding="20,8"
+                            FontSize="16" />
+                    <TextBlock Grid.Row="1"
+                               Margin="0,16,0,0"
+                               Text="{Binding ScanStatus}"
+                               TextWrapping="Wrap"
+                               FontSize="14" />
+                    <!-- TODO: This tab will display real-time vulnerability scan results and remediation steps. -->
+                </Grid>
+            </TabItem>
+            <TabItem Header="回線構成図" DataContext="{Binding NetworkTopology}">
+                <Grid Margin="16">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <Button Content="構成図を更新"
+                            Command="{Binding RefreshTopologyCommand}"
+                            HorizontalAlignment="Left"
+                            Padding="20,8"
+                            FontSize="16" />
+                    <TextBlock Grid.Row="1"
+                               Margin="0,16,0,0"
+                               Text="{Binding TopologySummary}"
+                               TextWrapping="Wrap"
+                               FontSize="14" />
+                    <!-- TODO: This tab will render an interactive topology map built from the discovered network connections. -->
+                </Grid>
+            </TabItem>
         </TabControl>
     </Grid>
 </Window>
