@@ -11,7 +11,7 @@ public class SecurityScanViewModel : ViewModelBase
 
     public SecurityScanViewModel(ISecurityScanService securityScanService)
     {
-        _securityScanService = securityScanService;
+        _securityScanService = securityScanService ?? throw new ArgumentNullException(nameof(securityScanService));
         RunSecurityScanCommand = new AsyncRelayCommand(RunSecurityScanAsync);
     }
 

@@ -47,6 +47,12 @@ public class SecurityScanViewModelTests
         serviceMock.Verify(service => service.GetSecurityStatus(), Times.Once);
     }
 
+    [Fact]
+    public void Constructor_WithNullSecurityScanService_ThrowsArgumentNullException()
+    {
+        Assert.Throws<ArgumentNullException>(() => new SecurityScanViewModel(null!));
+    }
+
     private static async Task WaitForAsync(Func<bool> condition, TimeSpan? timeout = null)
     {
         timeout ??= TimeSpan.FromSeconds(1);
