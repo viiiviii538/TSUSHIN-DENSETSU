@@ -28,7 +28,7 @@ public class SecurityScanViewModel : ViewModelBase
         try
         {
             ScanStatus = "診断を実行しています...";
-            var status = await Task.Run(_securityScanService.GetSecurityStatus);
+            var status = await _securityScanService.GetSecurityStatusAsync();
             ScanStatus = status;
         }
         catch (Exception ex)

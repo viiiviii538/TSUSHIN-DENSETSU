@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Moq;
 using TsushinDensetsu.App.Services;
@@ -12,21 +13,29 @@ public class SecurityScanViewModelTests
     [Fact]
     public async Task RunSecurityScanCommand_UpdatesStatusThroughLifecycle()
     {
+        const string initialStatus = "セキュリティ診断の準備ができています。";
+        const string runningStatus = "診断を実行しています...";
+        const string completedStatus = "全て安全です";
+
         var serviceMock = new Mock<ISecurityScanService>(MockBehavior.Strict);
+        var statusSource = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
         serviceMock
-            .Setup(service => service.GetSecurityStatus())
-            .Returns("全て安全です");
+            .Setup(service => service.GetSecurityStatusAsync(It.IsAny<CancellationToken>()))
+            .Returns(statusSource.Task);
 
         var viewModel = new SecurityScanViewModel(serviceMock.Object);
 
-        Assert.Equal("セキュリティ診断の準備ができています。", viewModel.ScanStatus);
+        Assert.Equal(initialStatus, viewModel.ScanStatus);
 
         viewModel.RunSecurityScanCommand.Execute(null);
 
-        await WaitForAsync(() => viewModel.ScanStatus == "診断を実行しています...");
-        await WaitForAsync(() => viewModel.ScanStatus == "全て安全です");
+        await WaitForAsync(() => viewModel.ScanStatus == runningStatus);
 
-        serviceMock.Verify(service => service.GetSecurityStatus(), Times.Once);
+        statusSource.SetResult(completedStatus);
+
+        await WaitForAsync(() => viewModel.ScanStatus == completedStatus);
+
+        serviceMock.Verify(service => service.GetSecurityStatusAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -34,17 +43,20 @@ public class SecurityScanViewModelTests
     {
         var serviceMock = new Mock<ISecurityScanService>(MockBehavior.Strict);
         serviceMock
-            .Setup(service => service.GetSecurityStatus())
-            .Throws(new InvalidOperationException("boom"));
+            .Setup(service => service.GetSecurityStatusAsync(It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("boom"));
 
         var viewModel = new SecurityScanViewModel(serviceMock.Object);
 
         viewModel.RunSecurityScanCommand.Execute(null);
 
-        await WaitForAsync(() => viewModel.ScanStatus.StartsWith("診断を実行しています"));
-        await WaitForAsync(() => viewModel.ScanStatus == "診断中にエラーが発生しました: boom");
+        const string runningStatus = "診断を実行しています...";
+        const string expectedErrorStatus = "診断中にエラーが発生しました: boom";
 
-        serviceMock.Verify(service => service.GetSecurityStatus(), Times.Once);
+        await WaitForAsync(() => viewModel.ScanStatus == runningStatus);
+        await WaitForAsync(() => viewModel.ScanStatus == expectedErrorStatus);
+
+        serviceMock.Verify(service => service.GetSecurityStatusAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
