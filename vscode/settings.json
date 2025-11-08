@@ -1,7 +1,0 @@
-{
-    "typescript.tsdk": "node_modules/typescript/lib",
-    "typescript.tsserver.enableProjectDiagnostics": true,
-    "typescript.tsserver.experimental.enableProjectDiagnostics": true,
-    "javascript.implicitProjectConfig.checkJs": true,
-    "typescript.implicitProjectConfig.checkJs": true
-}
