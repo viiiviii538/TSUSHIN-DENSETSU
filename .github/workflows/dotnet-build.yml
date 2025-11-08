@@ -1,0 +1,23 @@
+name: Build .NET solution
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: ソースコードをチェックアウト
+        uses: actions/checkout@v4
+
+      - name: .NET SDK をセットアップ
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: 依存関係を復元
+        run: dotnet restore src/TSUSHIN-DENSETSU.sln
+
+      - name: ソリューションをビルド
+        run: dotnet build src/TSUSHIN-DENSETSU.sln --configuration Release --no-restore
